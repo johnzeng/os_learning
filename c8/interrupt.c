@@ -82,6 +82,10 @@ static void general_intr_handler(uint8_t vec_nr) {
     put_str("int vector :0x");
     put_int(vec_nr);
     put_char('\n');
+    if(vec_nr == 0x0d)
+    {
+        while(1){};
+    }
 }
 
 enum intr_status intr_enable()

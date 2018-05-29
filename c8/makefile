@@ -1,5 +1,5 @@
-kernel: main.o print.o init.o kernel.o interrupt.o timer.o debug.o string.o bitmap.o
-	ld -melf_i386 main.o print.o init.o interrupt.o kernel.o timer.o string.o bitmap.o debug.o -Ttext 0xc0001500 -e main -o kernel.bin 
+kernel: main.o print.o init.o kernel.o interrupt.o timer.o debug.o string.o bitmap.o memory.o
+	ld -melf_i386 main.o print.o init.o interrupt.o kernel.o timer.o string.o bitmap.o memory.o debug.o -Ttext 0xc0001500 -e main -o kernel.bin 
 	dd if=kernel.bin of=hd60M.img bs=512 count=200 seek=9 conv=notrunc
 
 main.o: main.c print.h
@@ -7,6 +7,9 @@ main.o: main.c print.h
 
 bitmap.o: bitmap.c bitmap.h
 	gcc -m32 -I. -c -fno-stack-protector -fno-builtin -o bitmap.o bitmap.c
+
+memory.o: memory.c memory.h
+	gcc -m32 -I. -c -fno-stack-protector -fno-builtin -o memory.o memory.c
 
 string.o: string.c string.h
 	gcc -m32 -I. -c -fno-stack-protector -fno-builtin -o string.o string.c
