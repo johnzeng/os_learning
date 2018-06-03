@@ -9,7 +9,7 @@
 #define PIC_S_CTRL 0xa0
 #define PIC_S_DATA 0xa1
 
-#define IDT_DESC_CNT 0x21
+#define IDT_DESC_CNT 0x30
 
 struct gate_desc{
     uint16_t func_offset_low_word;
@@ -48,6 +48,9 @@ static void pic_init(void)
     outb(PIC_S_DATA, 0x01);
 
     outb(PIC_M_DATA, 0xfe);
+    outb(PIC_S_DATA, 0xff);
+
+    outb(PIC_M_DATA, 0xfc);
     outb(PIC_S_DATA, 0xff);
 
     put_str("pic_init done\n");

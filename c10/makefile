@@ -1,20 +1,26 @@
-kernel: main.o print.o init.o kernel.o interrupt.o timer.o debug.o string.o bitmap.o memory.o thread.o list.o switch.o console.o sync.o
-	ld -melf_i386 main.o print.o init.o interrupt.o kernel.o timer.o string.o bitmap.o memory.o debug.o list.o thread.o sync.o console.o switch.o -Ttext 0xc0001500 -e main -o kernel.bin 
+kernel: main.o print.o init.o kernel.o interrupt.o timer.o debug.o string.o bitmap.o memory.o thread.o list.o switch.o console.o sync.o keyboard.o ioqueue.o
+	ld -melf_i386 main.o print.o init.o interrupt.o kernel.o timer.o string.o bitmap.o memory.o debug.o list.o thread.o sync.o ioqueue.o console.o keyboard.o switch.o -Ttext 0xc0001500 -e main -o kernel.bin 
 	dd if=kernel.bin of=hd60M.img bs=512 count=200 seek=9 conv=notrunc
+	
+ioqueue.o: ioqueue.c ioqueue.h
+	gcc -m32 -I. -c -fno-stack-protector -fno-builtin -o ioqueue.o ioqueue.c
 
-sync.o: sync.c print.h
+sync.o: sync.c sync.h
 	gcc -m32 -I. -c -fno-stack-protector -fno-builtin -o sync.o sync.c
 
-console.o: console.c print.h
+console.o: console.c console.h
 	gcc -m32 -I. -c -fno-stack-protector -fno-builtin -o console.o console.c
 
 thread.o: thread.c thread.h
 	gcc -m32 -I. -c -fno-stack-protector -fno-builtin -o thread.o thread.c
 
-list.o: list.c print.h
+list.o: list.c list.h
 	gcc -m32 -I. -c -fno-stack-protector -fno-builtin -o list.o list.c
 
-main.o: main.c print.h
+keyboard.o: keyboard.c keyboard.h
+	gcc -m32 -I. -c -fno-stack-protector -fno-builtin -o keyboard.o keyboard.c
+
+main.o: main.c
 	gcc -m32 -I. -c -fno-stack-protector -fno-builtin -o main.o main.c
 
 bitmap.o: bitmap.c bitmap.h
