@@ -11,6 +11,9 @@
 
 #define IDT_DESC_CNT 0x30
 
+#define EFLAGS_IF 0x00000200
+#define GET_ELFAGS(EFLAG_VAR) asm volatile("pushfl; popl %0": "=g" (EFLAG_VAR))
+
 struct gate_desc{
     uint16_t func_offset_low_word;
     uint16_t selector;
@@ -19,20 +22,16 @@ struct gate_desc{
     uint16_t func_offset_high_word;
 };
 
-#define EFLAGS_IF 0x200
-#define GET_ELFAGS(EFLAG_VAR) asm volatile("pushfl; popl %0": "=g" (EFLAG_VAR))
-
 static void make_idt_desc(struct gate_desc* p_gdesc, uint8_t attr, intr_handler function);
-
 static struct gate_desc idt[IDT_DESC_CNT];
+char* intr_name[IDT_DESC_CNT];
+intr_handler idt_table[IDT_DESC_CNT];
+extern intr_handler intr_entry_table[IDT_DESC_CNT];
 
 static void idt_desc_init(void);
 
 static void exception_init(void);
 
-char* intr_name[IDT_DESC_CNT];
-intr_handler idt_table[IDT_DESC_CNT];
-extern intr_handler intr_entry_table[IDT_DESC_CNT];
 
 static void pic_init(void)
 {
@@ -50,22 +49,7 @@ static void pic_init(void)
     outb(PIC_M_DATA, 0xfe);
     outb(PIC_S_DATA, 0xff);
 
-    outb(PIC_M_DATA, 0xfc);
-    outb(PIC_S_DATA, 0xff);
-
     put_str("pic_init done\n");
-}
-
-void idt_init()
-{
-    put_str("idt_init start\n");
-    idt_desc_init();
-    exception_init();
-    pic_init();
-
-    uint64_t idt_operand = ((sizeof(idt) - 1) | ((uint64_t)((uint32_t)idt <<16)));
-    asm volatile("lidt %0" : : "m"(idt_operand));
-    put_str("idt_init done\n");
 }
 
 static void make_idt_desc(struct gate_desc* p_gdesc, uint8_t attr, intr_handler function)
@@ -75,6 +59,16 @@ static void make_idt_desc(struct gate_desc* p_gdesc, uint8_t attr, intr_handler 
     p_gdesc->dcount = 0;
     p_gdesc->attribute = attr;
     p_gdesc->func_offset_high_word = ((uint32_t)function & 0xFFFF0000) >> 16;
+}
+
+static void idt_desc_init(void)
+{
+    int i = 0;
+    for(i = 0 ; i < IDT_DESC_CNT; i++)
+    {
+        make_idt_desc(&idt[i], IDT_DESC_ATTR_DPL0, intr_entry_table[i]);
+    }
+    put_str("idt_desc_init done!\n");
 }
 
 static void general_intr_handler(uint8_t vec_nr) {
@@ -100,45 +94,6 @@ static void general_intr_handler(uint8_t vec_nr) {
     }
     put_str("\n!!!!! excetion message end\n");
     while(1);
-}
-
-enum intr_status intr_enable()
-{
-    enum intr_status old_status;
-    if(INTR_OFF == intr_get_status())
-    {
-        old_status = INTR_OFF;
-        asm volatile("sti");
-    }
-    else
-    {
-        old_status = INTR_ON;
-    }
-    return old_status;
-}
-enum intr_status intr_disable()
-{
-    enum intr_status old_status;
-    if(INTR_ON == intr_get_status())
-    {
-        old_status = INTR_ON;
-        asm volatile("cli": : : "memory");
-    }
-    else
-    {
-        old_status = INTR_OFF;
-    }
-    return old_status;
-}
-enum intr_status intr_set_status(enum intr_status status)
-{
-    return status & INTR_ON ? intr_enable() : intr_disable();
-}
-
-enum intr_status intr_get_status(){
-    uint32_t eflags = 0;
-    GET_ELFAGS(eflags);
-    return (EFLAGS_IF & eflags) ? INTR_ON : INTR_OFF;
 }
 
 static void exception_init(void){
@@ -171,17 +126,64 @@ static void exception_init(void){
 
 }
 
-static void idt_desc_init(void)
+enum intr_status intr_enable()
 {
-    int i = 0;
-    for(i = 0 ; i < IDT_DESC_CNT; i++)
+    enum intr_status old_status;
+    if(INTR_ON == intr_get_status())
     {
-        make_idt_desc(&idt[i], IDT_DESC_ATTR_DPL0, intr_entry_table[i]);
+        old_status = INTR_ON;
+        return old_status;
     }
-    put_str("idt_desc_init done!\n");
+    else
+    {
+        old_status = INTR_OFF;
+        asm volatile("sti");
+        return old_status;
+    }
+}
+
+enum intr_status intr_disable()
+{
+    enum intr_status old_status;
+    if(INTR_ON == intr_get_status())
+    {
+        old_status = INTR_ON;
+        asm volatile("cli": : : "memory");
+    }
+    else
+    {
+        old_status = INTR_OFF;
+    }
+    return old_status;
+}
+
+enum intr_status intr_set_status(enum intr_status status)
+{
+    return status & INTR_ON ? intr_enable() : intr_disable();
+}
+
+enum intr_status intr_get_status(){
+    uint32_t eflags = 0;
+    GET_ELFAGS(eflags);
+    return (EFLAGS_IF & eflags) ? INTR_ON : INTR_OFF;
 }
 
 void register_handler(uint8_t vector_no, intr_handler function)
 {
     idt_table[vector_no] = function;
 }
+
+void idt_init()
+{
+    put_str("idt_init start\n");
+    idt_desc_init();
+    exception_init();
+    pic_init();
+
+    uint64_t idt_operand = ((sizeof(idt) - 1) | ((uint64_t)((uint32_t)idt <<16)));
+    asm volatile("lidt %0" : : "m"(idt_operand));
+    put_str("idt_init done\n");
+}
+
+
+
